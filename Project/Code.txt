@@ -1,0 +1,219 @@
+#------------------------------------------------------------------------------------
+# manual nested cv
+
+scores = []
+inscorese=[]
+
+inner_kf = StratifiedKFold(n_splits=10, shuffle=False)
+
+for train_index, test_index in outer_rkf.split(X, y):
+    
+    # print("TRAIN:", train_index, "TEST:", test_index)
+    print("status: ", test_index, end='\r', flush=True)
+    X_train, X_test = X.iloc[train_index, :], X.iloc[test_index, :]
+    y_train, y_test = y[train_index], y[test_index]    
+    
+    # pipeline.fit(X_train, y_train)
+    
+    # scores.append(pipeline.score(X_test, y_test))
+    
+    inner_loop = GridSearchCV(pipeline, parameters, cv=10, refit=True, n_jobs=-1, verbose=False)
+    inner_loop.fit(X_train, y_train)
+       
+    score = inner_loop.best_estimator_.score(X_test, y_test)
+    scores.append(score)
+    
+print("cv score:", np.mean(scores))
+
+
+print("train score: ", (outer_loop['train_score']))
+print("test score:  ", (outer_loop['test_score']))
+
+#------------------------------------------------------------------------------------
+
+# profile = ProfileReport(df, title='Pandas Profiling Report', html={'style':{'full_width':True}})
+# profile.to_notebook_iframe()
+
+    # inner loop (for tuning)
+    #for train_index, validation_index in inner_kf.split(X_train):
+    #    X_train, X_valid = X.iloc[train_index, :], X.iloc[validation_index, :]
+    #    y_train, y_valid = y[train_index], y[validation_index]
+    
+# transformer = KernelPCA(n_components=None, kernel='rbf')
+# transformer = PCA(n_components=None)
+
+    # X_train_transformed = transformer.fit_transform(X)
+    # X_train_transformed = transformer.fit_transform(X_train)
+    # X_test_transformed = transformer.transform(X_test)
+    
+    # display(pd.DataFrame(X_train_transformed))
+    # print(X_train_transformed.shape)
+    
+# X_new = SelectKBest(chi2, k=10).fit_transform(X, y)
+# print(x_new.shape)
+
+#------------------------------------------------------------------------------------
+
+rf.fit(X, y)
+lr.fit(X, y)
+scaler.fit(X)
+b = scaler.transform(X)
+display(b)
+print("rf score: ", rf.score(X, y))
+print("lr score: ", lr.score(X, y))
+
+outer_kf = KFold(n_splits=53, shuffle=False)
+outer_loo = LeaveOneOut()
+
+rf_scores = []
+lr_scores = []
+
+#--------------------------------------------------------------------------------------
+# outer loop (for evaluation)
+#--------------------------------------------------------------------------------------
+for train_index, test_index in outer_loo.split(X):
+    
+    # print("TRAIN:", train_index, "TEST:", test_index)
+    print("status: ", test_index, end='\r', flush=True)
+    X_train, X_test = X.iloc[train_index, :], X.iloc[test_index, :]
+    y_train, y_test = y[train_index], y[test_index]
+    
+    X_train, X_test = remove_correlated_features(X_train, X_test, 0.85)
+    
+    
+    pipeline.fit(X_train, y_train)
+    # lr.fit(X_train, y_train)
+    
+    rf_scores.append(pipeline.score(X_test, y_test))
+    # lr_scores.append(lr.score(X_test, y_test))
+    
+print("rf cv score:", np.mean(rf_scores))
+# print("lr cv score:", np.mean(lr_scores))
+
+scores = cross_validate(pipeline, X, y, cv=outer_loo.split(X), scoring='accuracy', return_train_score=True)
+print("train score: ", np.mean(scores['train_score']))
+print("test score:  ", np.mean(scores['test_score']))
+#print("test score:  ", (scores['test_score']))
+
+#------------------------------------------------------------------------------------
+
+def remove_correlated_features(X_train, X_test, threshold):
+    corr_matrix = X_train.corr().abs()
+    upper = corr_matrix.where(np.triu(np.ones(corr_matrix.shape), k=1).astype(np.bool))
+    to_drop = [column for column in upper.columns if any(upper[column] > threshold)]
+    X_train_trimmed = X_train.drop(X_train[to_drop], axis=1)
+    X_test_trimmed = X_test.drop(X_test[to_drop], axis=1)
+    return (X_train_trimmed, X_test_trimmed)
+
+#------------------------------------------------------------------------------------
+
+
+
+
+
+
+
+
+
+
+
+#--------------------------------------------------------------------------------------
+
+def results(y, y_pred):
+    # confusion_matatrix
+    # TN, FP, FN, TP = confusion_matatrix.ravel()
+    confusion_matatrix = confusion_matrix(y, y_pred)
+    report = classification_report(y, y_pred, digits=5, target_names=['Low', 'High'])
+
+    class_accuracy = confusion_matatrix.diagonal()/confusion_matatrix.sum(axis=1)
+    overall_accuracy = confusion_matatrix.diagonal().sum()/confusion_matatrix.sum()
+
+    data = {'Overall': overall_accuracy, 'Low': class_accuracy[0], 'High': class_accuracy[1]}
+    results = pd.DataFrame(data, index = ['Accuracy'])
+
+    display(results)
+    # print(report)
+    # print(confusion_matatrix)
+    
+#--------------------------------------------------------------------------------------
+
+def results2(name, y, y_pred):
+
+    confusion_matatrix = confusion_matrix(y, y_pred)
+    class_accuracy = confusion_matatrix.diagonal()/confusion_matatrix.sum(axis=1)
+    overall_accuracy = confusion_matatrix.diagonal().sum()/confusion_matatrix.sum()
+
+    data = {'Overall': overall_accuracy, 'Low': class_accuracy[0], 'High': class_accuracy[1]}
+    results = pd.DataFrame(data, index = [name])
+
+    return results
+    
+#--------------------------------------------------------------------------------------
+
+def ttest_results(y, y_pred_before, y_pred_after):
+    
+    low_before     = (np.array(y[y==0]) == y_pred_before[y==0]).astype(int)
+    high_before    = (np.array(y[y==1]) == y_pred_before[y==1]).astype(int)
+    overall_before = (np.array(y) == y_pred_before).astype(int)
+
+    low_after     = (np.array(y[y==0]) == y_pred_after[y==0]).astype(int)
+    high_after    = (np.array(y[y==1]) == y_pred_after[y==1]).astype(int)
+    overall_after = (np.array(y) == y_pred_after).astype(int)
+
+    low_class  = ttest_rel(low_before, low_after)
+    high_class = ttest_rel(high_before, high_after)
+    overall    = ttest_rel(overall_before, overall_after)
+
+    print("low    :", low_class)
+    print("high   :", high_class)
+    print("overall:", overall)
+    
+#--------------------------------------------------------------------------------------
+
+def plot_results(df, title, save=True):
+    layout = cf.Layout(xaxis = cf.layout.XAxis(tickmode = 'linear'))
+    
+    fig = df.T.iplot(asFigure=True, xTitle="Window", yTitle="Accuracy", 
+              title=title, legend='top')
+    fig.show()
+    if (save):
+        fig.write_html("images/" + title + ".html")
+        fig.write_image("images/" + title + ".pdf")
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# loo = LeaveOneOut()
+
+# inner_loop = GridSearchCV(pipeline, parameters, cv=inner_rkf, refit=True, n_jobs=-1, verbose=False)
+# inner_loop = RandomizedSearchCV(pipeline, parameters, n_iter=10, cv=inner_rkf, refit=True, n_jobs=-1, verbose=False)
+# inner_loop = BayesSearchCV(pipeline, parameters, n_iter=2, n_points=2, cv=10, refit=True, n_jobs=-1, verbose=False)
+
+# outer_loop = cross_validate(pipeline, X, y, cv=loo, return_train_score=True, 
+#                             n_jobs=-1, verbose=1, return_estimator=True)
+# outer_loop['estimator'][0].best_estimator_
+
+# y_pred_before = cross_val_predict(original, X, y, cv=loo, n_jobs=-1, verbose=1)
+# y_pred_after  = cross_val_predict(engineered, X, y, cv=loo, n_jobs=-1, verbose=1)
+
+#--------------------------------------------------------------------------------------
+
+# print("train score: ", np.mean(outer_loop['train_score']))
+# print("test score:  ", np.mean(outer_loop['test_score']))
+
+# results(y, y_pred_before)
+# results(y, y_pred_after)
+
+# ttest_results(y, y_pred_before, y_pred_after)
